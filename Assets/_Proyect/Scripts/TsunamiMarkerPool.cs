@@ -4,9 +4,7 @@ using UnityEngine;
 using Unity.Mathematics;
 using CesiumForUnity;
 using UnityEngine.UI;
-#if TMP_PRESENT
 using TMPro;
-#endif
 
 public class MultiAnchorsFromJsonFrames : MonoBehaviour
 {
@@ -23,11 +21,9 @@ public class MultiAnchorsFromJsonFrames : MonoBehaviour
 
     [Header("Control de tiempo (opcional)")]
     public Slider slider;               // 0..frames-1 (whole numbers)
-#if TMP_PRESENT
-    public TMP_Text label;              // muestra "5 min" o "t=300s"
-#else
-    public Text label;
-#endif
+
+    public TMP_Text label;
+    
     public KeyCode prevKey = KeyCode.LeftBracket;   // [
     public KeyCode nextKey = KeyCode.RightBracket;  // ]
 
@@ -124,7 +120,7 @@ public class MultiAnchorsFromJsonFrames : MonoBehaviour
         string txt = !string.IsNullOrEmpty(_root.frames[_index].label)
             ? _root.frames[_index].label
             : $"t={_root.frames[_index].t}s";
-        if (label) label.text = txt;
+        if (label) label.text = "Tiempo: "+txt;
 
         Debug.Log($"[MultiAnchorsFromJsonFrames] Frame #{_index} → {txt}");
     }
