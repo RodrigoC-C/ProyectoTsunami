@@ -14,7 +14,7 @@ public class TsunamiManager : MonoBehaviour
     public TsunamiVisualizer visualizer;   // coloca este en un GO “TsunamiSystem”
 
     [Header("State")]
-    public bool autoPlay = true;
+    public bool autoPlay = false;
     public float secondsPerFrame = 2f;
 
     private FramesPayload _payload;

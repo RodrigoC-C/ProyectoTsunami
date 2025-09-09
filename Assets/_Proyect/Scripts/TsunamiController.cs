@@ -27,6 +27,13 @@ public class TsunamiController : MonoBehaviour
     float baseSeaLevelWorldY; // <-- altura base del agua en coordenadas de mundo (para offset relativo)
     float initialWaveHeight;
 
+    [Header("Run Control")]
+    public bool stopAtTarget = true;
+    public float stopDistance = 2f;
+
+    private bool _running;
+
+
     void Start()
     {
         if (!waterPlane)
@@ -46,27 +53,47 @@ public class TsunamiController : MonoBehaviour
                   Mathf.Sqrt(Mathf.Max(1f, oceanDepth) / Mathf.Max(1f, coastalDepth));
     }
 
+    public void BeginTowards(Transform target, Vector3 startWorldPos)
+    {
+        coastTarget = target;
+        transform.position = startWorldPos;
+        _running = true;
+    }
+
+    public void StopRun()
+    {
+        _running = false;
+    }
+
     void Update()
     {
         if (!waterPlane) return;
 
-        // (1) Avance del "frente" hacia la costa — opcional
-        if (coastTarget && waveFrontSpeedMultiplier > 0f)
+        if (_running && coastTarget && waveFrontSpeedMultiplier > 0f)
         {
-            float speed = vDeep * waveFrontSpeedMultiplier; // m/s (ajusta a escala de tu escena)
-            Vector3 targetXZ = new Vector3(
+            Vector3 targetPos = new Vector3(
                 coastTarget.position.x,
-                transform.position.y, // conserva Y del WaterRoot
+                transform.position.y, // mantenemos nivel del agua
                 coastTarget.position.z
             );
-            transform.position = Vector3.MoveTowards(transform.position, targetXZ, speed * Time.deltaTime);
+
+            // Si ya estoy dentro del radio, me pego EXACTO y paro
+            if ((transform.position - targetPos).sqrMagnitude <= stopDistance * stopDistance)
+            {
+                transform.position = targetPos;  // <--- SNAP EXACTO
+                _running = false;
+            }
+            else
+            {
+                float speed = vDeep * waveFrontSpeedMultiplier;
+                transform.position = Vector3.MoveTowards(transform.position, targetPos, speed * Time.deltaTime);
+            }
         }
 
-        // (2) Incremento gradual de la “altura visual” (escala Y) al acercarse a la costa
+        // Altura visual (como ya tenías)
         if (coastTarget)
         {
             float d = Vector3.Distance(transform.position, coastTarget.position);
-            // Ajusta estos valores a tu escala: 5000 (lejos) → 50 (cerca)
             float lerp = Mathf.InverseLerp(5000f, 50f, d);
             float H = Mathf.Lerp(initialWaveHeight, targetH, 1f - lerp);
 
@@ -75,4 +102,7 @@ public class TsunamiController : MonoBehaviour
             waterPlane.localScale = s;
         }
     }
+
+        
+
 }

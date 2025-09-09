@@ -59,10 +59,12 @@ public class TsunamiUIController : MonoBehaviour
 
     private void HandleFrameChanged(FrameOut frame, int index, int total)
     {
-        if (!_ready) return;
-        // Evitamos loop slider->evento->slider
         frameSlider.SetValueWithoutNotify(index);
-        if (labelText) labelText.text = $"{frame.label}";
+        if (labelText) labelText.text = $"{frame.label} ";
+
+        // Lanza la animación de parches hacia los marcadores del frame mostrado
+        if (manager.visualizer != null)
+            manager.visualizer.LaunchWavePatchesTowardCurrentMarkers(frame);
     }
 
     private void OnSliderChanged(float value)
@@ -70,6 +72,8 @@ public class TsunamiUIController : MonoBehaviour
         if (!_ready) return;
         manager.GoToIndex(Mathf.RoundToInt(value));
     }
+
+
 
     // Botones opcionales
     public void BtnPrev() { manager.PrevFrame(); }

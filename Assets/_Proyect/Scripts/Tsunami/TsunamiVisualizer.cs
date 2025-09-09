@@ -20,6 +20,14 @@ public class TsunamiVisualizer : MonoBehaviour
     public bool testBigMarkers = false;
     [Min(0.1f)] public float testScaleMeters = 30f;
 
+
+    [Header("Wave Patches")]
+    public GameObject wavePatchPrefab;   // el prefab con TsunamiController
+    public Transform deepSeaOrigin;      // un Empty mar adentro
+    public float startFromTargetMeters = 3000f; // qué tan mar adentro parte cada parche
+
+    private readonly List<GameObject> _wavePool = new List<GameObject>();
+
     void Awake()
     {
         if (!georeference) georeference = Object.FindAnyObjectByType<CesiumGeoreference>();
@@ -64,6 +72,42 @@ public class TsunamiVisualizer : MonoBehaviour
             {
                 go.SetActive(false);
             }
+        }
+    }
+
+    public void LaunchWavePatchesTowardCurrentMarkers(FrameOut frame)
+    {
+        if (frame == null || frame.points == null) return;
+        EnsureWavePool(frame.points.Count);
+
+        for (int i = 0; i < frame.points.Count; i++)
+        {
+            var marker = _pool[i];
+            var waveGo = _wavePool[i];
+            waveGo.SetActive(true);
+
+            var ctrl = waveGo.GetComponent<TsunamiController>();
+
+            // Dirección: DE DeepSeaOrigin HACIA el marcador
+            var dir = (marker.transform.position - deepSeaOrigin.position).normalized;
+
+            // Punto de partida: "startFromTargetMeters" por detrás del marcador (hacia el mar)
+            var startPos = marker.transform.position - dir * startFromTargetMeters;
+
+            ctrl.BeginTowards(marker.transform, startPos);
+        }
+
+        for (int i = frame.points.Count; i < _wavePool.Count; i++)
+            _wavePool[i].SetActive(false);
+    }
+
+    private void EnsureWavePool(int needed)
+    {
+        while (_wavePool.Count < needed)
+        {
+            var parent = markersRoot ? markersRoot : transform;   // <--- MISMO PARENT QUE MARCADORES
+            var go = Instantiate(wavePatchPrefab, parent);
+            _wavePool.Add(go);
         }
     }
 
