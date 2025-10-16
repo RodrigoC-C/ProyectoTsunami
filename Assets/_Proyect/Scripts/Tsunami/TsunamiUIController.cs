@@ -11,6 +11,7 @@ public class TsunamiUIController : MonoBehaviour
     public TMP_Text labelText;      // o TMP_Text labelText;
 
     private bool _ready;
+    public WaterMaskController maskController;
 
     void OnEnable()
     {
@@ -62,9 +63,11 @@ public class TsunamiUIController : MonoBehaviour
         frameSlider.SetValueWithoutNotify(index);
         if (labelText) labelText.text = $"{frame.label} ";
 
-        // Lanza la animación de parches hacia los marcadores del frame mostrado
         if (manager.visualizer != null)
             manager.visualizer.LaunchWavePatchesTowardCurrentMarkers(frame);
+
+        if (maskController != null)
+            maskController.PaintTowardFrame(frame, manager.visualizer.deepSeaOrigin.position);
     }
 
     private void OnSliderChanged(float value)

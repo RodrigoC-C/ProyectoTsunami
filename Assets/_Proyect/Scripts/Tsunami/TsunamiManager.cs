@@ -24,6 +24,7 @@ public class TsunamiManager : MonoBehaviour
 
     public event Action<FramesPayload> OnFramesLoaded;
     public event Action<FrameOut, int, int> OnFrameChanged;
+    public WaterMeshClipper waterClipper;
 
     private void Awake()
     {
@@ -67,7 +68,17 @@ public class TsunamiManager : MonoBehaviour
     {
         var total = _payload?.frames?.Count ?? 0;
         if (total > 0)
-            OnFrameChanged?.Invoke(_payload.frames[_frameIndex], _frameIndex, total);
+        {
+            var f = _payload.frames[_frameIndex];
+            OnFrameChanged?.Invoke(f, _frameIndex, total);
+
+            // --- NUEVO: reconstruir malla de agua recortada para este frame ---
+            if (waterClipper != null)
+            {
+                waterClipper.RebuildForFrame(f);
+                Debug.Log($"[Tsunami] Clip frame #{_frameIndex} '{f.label}'");
+            }
+        }
     }
 
     public void GoToIndex(int index)
