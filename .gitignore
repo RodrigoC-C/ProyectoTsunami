@@ -101,3 +101,7 @@ InitTestScene*.unity*
 # Asset
 /Assets/Art/HeightmapsEtaInd/eta/
 /Assets/Art/HeightmapsEtaInd/eta/*
+
+# Large Unity Scenes
+/Assets/Tsunami.unity
+/Assets/Tsunami.unity.meta
