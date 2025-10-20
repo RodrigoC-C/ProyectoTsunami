@@ -20,8 +20,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: WaterMaterial
-  m_Shader: {fileID: 4800000, guid: d06f7a7285e20ea409bf0dc73f1b096a, type: 3}
+  m_Name: WaterMaterial 1
+  m_Shader: {fileID: 4800000, guid: 13ce87b3faff42a4ba8a041f1c1d2d43, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -61,28 +61,8 @@ Material:
         m_Texture: {fileID: 2800000, guid: cd1e3ba98561c0f49ab5bb8e38b5ed7e, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
-    - _DisplacementTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
     - _EmissionMap:
         m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _EtaArray:
-        m_Texture: {fileID: 18700000, guid: 7e7381733a8268244a48a6d1aa5d96c3, type: 2}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _FoamTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _HeightArray:
-        m_Texture: {fileID: 18700000, guid: 19f4bc900176f964693a511de9924d72, type: 2}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _InundArray:
-        m_Texture: {fileID: 18700000, guid: b6c84ff2c2911fc419f5ae80d18f61d3, type: 2}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
@@ -91,10 +71,6 @@ Material:
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
         m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _NormalMap:
-        m_Texture: {fileID: 2800000, guid: 5e620eda043373f4f9a8d215f74e1042, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _OcclusionMap:
@@ -106,10 +82,6 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _SpecGlossMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _WaterTex:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -127,13 +99,10 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _AbsorbStr: 0.8
     - _AddPrecomputedVelocity: 0
-    - _Alpha: 0.6
     - _AlphaClip: 0
     - _AlphaToMask: 0
-    - _BaseY: 0
-    - _Blend: 0.0078125
+    - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
     - _ClearCoatMask: 0
@@ -146,65 +115,30 @@ Material:
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
-    - _EtaMax: 0.5
-    - _EtaMin: -0.5
-    - _FPS: 14
-    - _Feather: 2
-    - _FlipV: 1
-    - _FoamIntensity: 1.2
-    - _FoamScale: 0.05
-    - _FoamThreshold: 0.35
-    - _FoamWidth: 1.5
-    - _Frame: 13
-    - _FrameCount: 41
-    - _FrameIndex: 0
-    - _FrameLerp: 0
-    - _FresnelPow: 4
-    - _FresnelPower: 5
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _HeightScale: 1
-    - _InundMax: 3
-    - _InvRes: 0.001953125
     - _Metallic: 0
-    - _NextFrame: 14
-    - _NormalScale: 1
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _Rotate90: 0
-    - _ScrollSpeedX: 0.05
-    - _ScrollSpeedY: 0.03
-    - _Slice: 0
-    - _SmoothStrength: 1
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
-    - _SpecularPow: 64
-    - _SpecularStr: 0.4
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
-    - _Tiling: 10
-    - _VerticalScale: 10
     - _WorkflowMode: 1
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 0.041251317, g: 0.16126183, b: 1, a: 0.7176471}
     - _Color: {r: 0, g: 0, b: 1, a: 0}
-    - _DeepColor: {r: 0.02, g: 0.06999998, b: 0.11999995, a: 1}
-    - _DomainSize: {r: 512, g: 512, b: 0, a: 0}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _EtaMinMax: {r: -1, g: 1, b: 0, a: 0}
-    - _FoamColor: {r: 0.1745283, g: 0.34570464, b: 1, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _Tint: {r: 1, g: 1, b: 1, a: 0.8}
     - _UVOffset: {r: 0, g: 0, b: 0, a: 0}
     - _UVScale: {r: 1, g: 1, b: 0, a: 0}
-    - _WaterColor: {r: 0.09905658, g: 0.47118253, b: 0.986, a: 0.12156863}
-    - _WaterTint: {r: 0.079999976, g: 0.34999996, b: 0.8, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

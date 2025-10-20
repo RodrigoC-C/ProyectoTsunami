@@ -1,0 +1,81 @@
+#pragma kernel CSMain
+
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+// Parámetros iguales a tu shader
+float _EtaMin, _EtaMax;
+float _VerticalScale, _BaseY;
+float _FrameLerp;
+float2 _EtaTexelSize;
+float2 _DomainSize; // Tamaño de la malla
+int _FrameIndex, _NextFrameIndex;
+float _SmoothStrength;
+
+// Texturas de entrada
+Texture2DArray<float> _EtaArray;
+SamplerState sampler_EtaArray;
+
+// Buffer de salida
+RWTexture2D<float> _DisplacementOutput;
+
+// Utilidades (igual que tu shader)
+float u16_to_eta(float r01) { 
+    return lerp(_EtaMin, _EtaMax, saturate(r01)); 
+}
+
+float catmull(float x){
+    x = abs(x);
+    if (x < 1.0) return 1.0 + x*x*(-2.5 + 1.5*x);
+    if (x < 2.0) return 2.0 + x*(-4.0 + x*(2.5 - 0.5*x));
+    return 0.0;
+}
+
+float bilinearA(float2 uv, int slice){
+    return _EtaArray.SampleLevel(sampler_EtaArray, float3(uv, slice), 0);
+}
+
+float bicubicA(float2 uv, int slice){
+    float2 st = uv / _EtaTexelSize - 0.5;
+    float2 i = floor(st);
+    float2 f = st - i;
+
+    float wx[4] = {catmull(1.0+f.x), catmull(f.x), catmull(1.0-f.x), catmull(2.0-f.x)};
+    float wy[4] = {catmull(1.0+f.y), catmull(f.y), catmull(1.0-f.y), catmull(2.0-f.y)};
+
+    float sum = 0, norm = 0;
+    for(int m = -1; m <= 2; m++) {
+        for(int n = -1; n <= 2; n++) {
+            float2 uv2 = (i + float2(m, n) + 0.5) * _EtaTexelSize;
+            float w = wx[m+1] * wy[n+1];
+            sum += _EtaArray.SampleLevel(sampler_EtaArray, float3(uv2, slice), 0) * w;
+            norm += w;
+        }
+    }
+    return sum / max(norm, 1e-5);
+}
+
+float sampleA(float2 uv, int slice){
+    float a = bilinearA(uv, slice);
+    float b = bicubicA(uv, slice);
+    return lerp(a, b, _SmoothStrength);
+}
+
+float etaAt(float2 uv, int slice) { 
+    return u16_to_eta(sampleA(uv, slice)); 
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float2 uv = float2(id.x / _DomainSize.x, id.y / _DomainSize.y);
+    
+    if (id.x >= _DomainSize.x || id.y >= _DomainSize.y)
+        return;
+
+    float eA = etaAt(uv, _FrameIndex);
+    float eB = etaAt(uv, _NextFrameIndex);
+    float eta = lerp(eA, eB, saturate(_FrameLerp));
+    
+    // Guardar desplazamiento en metros
+    _DisplacementOutput[id.xy] = _BaseY + eta * _VerticalScale;
+}
