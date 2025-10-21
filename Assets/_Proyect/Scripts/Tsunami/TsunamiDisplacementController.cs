@@ -124,12 +124,5 @@ public class TsunamiDisplacementController : MonoBehaviour
         }
     }
     
-    // Para debugging - mostrar la textura de desplazamiento
-    void OnGUI()
-    {
-        if (_displacementTexture != null && Application.isEditor)
-        {
-            GUI.DrawTexture(new Rect(10, 10, 200, 200), _displacementTexture, ScaleMode.ScaleToFit, false);
-        }
-    }
+    
 }

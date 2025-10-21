@@ -1,23 +1,25 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class TsunamiManager : MonoBehaviour
 {
     [Header("Config")]
     public ApiSettings apiSettings;
-    public string timesCSV = "300,600,1800"; // puedes dejar vacío y traer últimos N desde la API cambiando el endpoint
+    public string timesCSV = "300,600,1800"; // puedes dejar vacï¿½o y traer ï¿½ltimos N desde la API cambiando el endpoint
 
     [Header("Refs")]
-    public ApiService apiService;          // coloca este componente en un GO “DataSystems”
-    public TsunamiVisualizer visualizer;   // coloca este en un GO “TsunamiSystem”
+    public ApiService apiService;          // coloca este componente en un GO ï¿½DataSystemsï¿½
+    public TsunamiVisualizer visualizer;   // coloca este en un GO ï¿½TsunamiSystemï¿½
 
     [Header("State")]
     public bool autoPlay = false;
     public float secondsPerFrame = 2f;
 
     private FramesPayload _payload;
+    private List<Tsunami.Services.DataService.FrameMeta> _localFrames;
     private int _frameIndex = 0;
     private bool _isPlaying = false;
     private Coroutine _playCo;
@@ -25,11 +27,17 @@ public class TsunamiManager : MonoBehaviour
     public event Action<FramesPayload> OnFramesLoaded;
     public event Action<FrameOut, int, int> OnFrameChanged;
     public WaterMeshClipper waterClipper;
+    public HeightmapPlaybackController playbackController;
 
     private void Awake()
     {
         if (!apiService) apiService = FindAnyObjectByType<ApiService>();
         if (apiService) apiService.Init(apiSettings);
+        if (!playbackController) playbackController = FindAnyObjectByType<HeightmapPlaybackController>();
+        if (playbackController != null)
+        {
+            playbackController.OnFrameChanged += HandlePlaybackFrameChanged;
+        }
     }
 
     private void Start()
@@ -53,7 +61,7 @@ public class TsunamiManager : MonoBehaviour
                     OnFramesLoaded?.Invoke(_payload);
 
                     // Importante: SIN autoplay por tu requerimiento
-                    // if (autoPlay) Play();  // <- deja esto comentado o asegúrate de tener autoPlay=false
+                    // if (autoPlay) Play();  // <- deja esto comentado o asegï¿½rate de tener autoPlay=false
                 }
                 else
                 {
@@ -62,6 +70,28 @@ public class TsunamiManager : MonoBehaviour
             },
             onError: (err) => Debug.LogError("[Tsunami] " + err)
         );
+    }
+
+    // ------------------ Nuevo: cargar frames locales ya descargados (rutas + t_sec)
+    public void LoadLocalFrames(List<Tsunami.Services.DataService.FrameMeta> localFrames)
+    {
+        if (localFrames == null || localFrames.Count == 0) return;
+        _localFrames = new List<Tsunami.Services.DataService.FrameMeta>(localFrames);
+
+        // Informar al playback controller
+        var paths = _localFrames.Select(f => f.LocalPath).ToList();
+        var tsecs = _localFrames.Select(f => f.TSec).ToList();
+        playbackController?.SetSecondsPerFrame(secondsPerFrame);
+        playbackController?.Begin(paths);
+        playbackController?.SetFrameTimes(tsecs);
+
+        // Mostrar primer frame en el visualizer
+        // intentar mapear el FrameOut equivalente si tenemos payload
+        if (_payload != null && _payload.frames != null && _payload.frames.Count > 0)
+        {
+            var maybe = _payload.frames[0];
+            visualizer.ShowFrame(maybe);
+        }
     }
 
     private void OnFrameLoadedOrChanged()
@@ -91,6 +121,14 @@ public class TsunamiManager : MonoBehaviour
 
     public void NextFrame()
     {
+        if (_localFrames != null && _localFrames.Count > 0)
+        {
+            _frameIndex = (_frameIndex + 1) % _localFrames.Count;
+            // trigger playback
+            playbackController?.Next();
+            OnFrameLoadedOrChanged();
+            return;
+        }
         if (_payload?.frames == null || _payload.frames.Count == 0) return;
         _frameIndex = (_frameIndex + 1) % _payload.frames.Count;
         visualizer.ShowFrame(_payload.frames[_frameIndex]);
@@ -99,6 +137,13 @@ public class TsunamiManager : MonoBehaviour
 
     public void PrevFrame()
     {
+        if (_localFrames != null && _localFrames.Count > 0)
+        {
+            _frameIndex = (_frameIndex - 1 + _localFrames.Count) % _localFrames.Count;
+            playbackController?.Prev();
+            OnFrameLoadedOrChanged();
+            return;
+        }
         if (_payload?.frames == null || _payload.frames.Count == 0) return;
         _frameIndex = (_frameIndex - 1 + _payload.frames.Count) % _payload.frames.Count;
         visualizer.ShowFrame(_payload.frames[_frameIndex]);
@@ -107,12 +152,41 @@ public class TsunamiManager : MonoBehaviour
 
     public void GoToTimeSeconds(int t)
     {
-        if (_payload?.frames == null) return;
-        int idx = _payload.frames.FindIndex(f => f.t == t);
-        if (idx >= 0)
+        if (_localFrames != null && _localFrames.Count > 0)
         {
-            _frameIndex = idx;
+            int idx = _localFrames.FindIndex(f => f.TSec == t);
+            if (idx >= 0)
+            {
+                _frameIndex = idx;
+                playbackController?.Seek(idx);
+            }
+            return;
+        }
+        if (_payload?.frames == null) return;
+        int idx2 = _payload.frames.FindIndex(f => f.t == t);
+        if (idx2 >= 0)
+        {
+            _frameIndex = idx2;
             visualizer.ShowFrame(_payload.frames[_frameIndex]);
+        }
+    }
+
+    private void HandlePlaybackFrameChanged(int index, int tsec)
+    {
+        // Mapear el index a FrameOut si hay payload
+        if (_payload?.frames != null && index >= 0 && index < _payload.frames.Count)
+        {
+            var f = _payload.frames[index];
+            OnFrameChanged?.Invoke(f, index, _payload.frames.Count);
+            visualizer.ShowFrame(f);
+        }
+        else if (_localFrames != null && index >= 0 && index < _localFrames.Count)
+        {
+            // Crear un FrameOut temporal con label y t
+            var meta = _localFrames[index];
+            var fo = new FrameOut { label = $"frame_{meta.Index}", t = meta.TSec, points = new System.Collections.Generic.List<PointOut>() };
+            OnFrameChanged?.Invoke(fo, index, _localFrames.Count);
+            visualizer.ShowFrame(fo);
         }
     }
 }

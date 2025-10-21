@@ -1,7 +1,7 @@
 using UnityEngine;
 
 [ExecuteAlways]
-public class HeightArrayPlayback : MonoBehaviour
+public class LegacyHeightArrayPlayback : MonoBehaviour
 {
     [Header("Material / Malla")]
     public MeshRenderer targetRenderer;
@@ -24,9 +24,7 @@ public class HeightArrayPlayback : MonoBehaviour
     public bool rotate90 = false;
 
     [Header("Inundation 'Patch'")]
-    [Tooltip("Cuántos metros sube el NIVEL DEL MAR por cada frame de la animación.")]
     public float riseAmountPerFrame = 10f;
-    [Tooltip("El frame en el que la subida del mar debe empezar.")]
     public int riseStartFrame = 5;
 
     float t;
@@ -36,7 +34,8 @@ public class HeightArrayPlayback : MonoBehaviour
     bool _isPlaying;
 
     public int FrameCount => heightArray ? heightArray.depth : 0;
-    public int CurrentIndex => Mathf.Clamp(cursor, 0, Mathf.Max(0, FrameCount - 1));
+    public int CurrentIndex => Mathf.Clamp(cursor, 0, Mathf.Max(0, FrameCount-1));
+
     public System.Action<int> OnSliceChanged;
 
     void Start() => initialYPosition = transform.localPosition.y;
@@ -100,14 +99,13 @@ public class HeightArrayPlayback : MonoBehaviour
         var p = transform.localPosition;
         transform.localPosition = new Vector3(p.x, initialYPosition + riseOffset, p.z);
 
-        #if UNITY_EDITOR
+#if UNITY_EDITOR
         UnityEditor.SceneView.RepaintAll();
-        #endif
-
+#endif
         OnSliceChanged?.Invoke(CurrentIndex);
     }
 
-    // ==== API para control externo ====
+    // ==== API pública para el timeline externo ====
     public void Play()  { _isPlaying = true; }
     public void Pause() { _isPlaying = false; }
     public void Stop()  { _isPlaying = false; Seek(0); }
