@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using Tsunami.Core; // Usa SimTime.FormatAuto(...) para formatear segundos
+//using Tsunami.Core; // Usa SimTime.FormatAuto(...) para formatear segundos
 
 /// <summary>
 /// Timeline maestro: controla play/pause/seek del HeightArrayPlayback,
@@ -230,8 +230,8 @@ public class TsunamiTimelineController : MonoBehaviour
         int tsecsRel = Mathf.Max(0, tsecsAbs - _baseStartSec);
 
         // Formato automático (mm:ss, hh:mm:ss o d:hh:mm:ss)
-        string pretty = SimTime.FormatAuto(tsecsRel);
+        //string pretty = SimTime.FormatAuto(tsecsRel);
 
-        timeLabel.text = $"{pretty}  ({_index + 1}/{FrameCount})";
+        //  timeLabel.text = $"{pretty}  ({_index + 1}/{FrameCount})";
     }
 }
