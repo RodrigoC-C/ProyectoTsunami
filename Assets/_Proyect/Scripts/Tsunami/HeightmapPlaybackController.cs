@@ -42,6 +42,10 @@ public class HeightmapPlaybackController : MonoBehaviour
 
     private Coroutine _playCo;
     private int _cursor;                  // frame actual
+    private List<int> _tSecs = new List<int>();
+
+    // Eventos para suscriptores: index actual y tiempo en segundos (t_sec)
+    public event System.Action<int, int> OnFrameChanged; // (index, t_sec)
 
     private void Awake()
     {
@@ -80,9 +84,49 @@ public class HeightmapPlaybackController : MonoBehaviour
 
         _paths = new List<string>(localHeightmapPaths);
         _cursor = 0;
+    _tSecs = new List<int>(_paths.Count); // se podrá rellenar por TsunamiManager cuando sea necesario
 
         if (_playCo != null) StopCoroutine(_playCo);
         _playCo = StartCoroutine(PlayRoutine());
+    }
+
+    public void SetFrameTimes(List<int> tsecs)
+    {
+        _tSecs = tsecs ?? new List<int>(_paths.Count);
+    }
+
+    public void Play()
+    {
+        if (_playCo == null) _playCo = StartCoroutine(PlayRoutine());
+    }
+
+    public void Pause()
+    {
+        if (_playCo != null)
+        {
+            StopCoroutine(_playCo);
+            _playCo = null;
+        }
+    }
+
+    public void ResetToStart()
+    {
+        _cursor = 0;
+        ApplyCurrent();
+    }
+
+    public void Next()
+    {
+        if (_paths == null || _paths.Count == 0) return;
+        _cursor = Mathf.Min(_cursor + 1, _paths.Count - 1);
+        ApplyCurrent();
+    }
+
+    public void Prev()
+    {
+        if (_paths == null || _paths.Count == 0) return;
+        _cursor = Mathf.Max(_cursor - 1, 0);
+        ApplyCurrent();
     }
 
     /// <summary>
@@ -139,5 +183,8 @@ public class HeightmapPlaybackController : MonoBehaviour
         if (_tex == null) _tex = new Texture2D(2, 2, TextureFormat.R8, false, true); // R8 suficiente para displacements normalizados
         _tex.LoadImage(bytes, false);
         _mat.SetTexture(_dispId, _tex);
+
+        var tse = (_tSecs != null && _cursor >= 0 && _cursor < _tSecs.Count) ? _tSecs[_cursor] : 0;
+        OnFrameChanged?.Invoke(_cursor, tse);
     }
 }

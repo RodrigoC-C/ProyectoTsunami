@@ -10,7 +10,7 @@ using UnityEngine.Networking;
 namespace Tsunami.Services
 {
     /// <summary>
-    /// Servicio de datos: consulta timeline y descarga heightmaps (MinIO presignado) según tu API.
+    /// Servicio de datos: consulta timeline y descarga heightmaps (URL firmada) según tu API.
     /// </summary>
     public sealed class DataService
     {
@@ -26,12 +26,12 @@ namespace Tsunami.Services
         /// <summary>Carpeta base de caché temporal.</summary>
         public string CacheBasePath { get; }
 
-        /// <summary>Intervalo entre frames reportado por la API (segundos). Úsalo para el playback.</summary>
+        /// <summary>Intervalo entre frames reportado por la API (segundos). Úsalo como fallback.</summary>
         public int LastFrameIntervalSeconds { get; private set; } = 0;
 
-        public event Action<float> OnOverallProgress;           // 0..1 total
-        public event Action<int, string> OnFileStarted;         // idx, path
-        public event Action<int, string> OnFileCompleted;       // idx, path
+        public event Action<float> OnOverallProgress;
+        public event Action<int, string> OnFileStarted;
+        public event Action<int, string> OnFileCompleted;
         public event Action<string> OnLog;
 
         public DataService(string apiBaseUrl, string subFolder = "heightmaps_cache")
@@ -41,12 +41,12 @@ namespace Tsunami.Services
             Directory.CreateDirectory(CacheBasePath);
         }
 
-        // ====== DTOs (exactos a tu backend) ======
+        // ====== DTOs (según backend) ======
         [Serializable] private class TimelineItem
         {
             public int t_index;
             public int t_sec;
-            public int width;   // en tu JSON vienen null -> JsonUtility los deja en 0
+            public int width;
             public int height;
             public string format;
         }
@@ -63,29 +63,54 @@ namespace Tsunami.Services
         {
             public int t_index;
             public int t_sec;
-            public string url;        // presigned URL
+            public string url;
             public int width;
             public int height;
-            public string format;     // "png"
+            public string format;
         }
 
         private class DownloadItem
         {
             public int Index;
+            public int TSec;
             public string Url;
             public string LocalPath;
-            public long ExpectedBytes;   // no viene en tu API (queda 0, se ignora)
-            public string ETag;          // no viene en tu API
+            public long ExpectedBytes;
+            public string ETag;
+        }
+
+        public class FrameMeta
+        {
+            public int Index { get; set; }       // 1..N (como en tu API)
+            public int TSec { get; set; }
+            public string LocalPath { get; set; }
+        }
+
+        private class TimelineInfo
+        {
+            public List<int> indices;
+            public Dictionary<int, int> indexToSec;
+            public int frameIntervalSec;
         }
 
         // ====== API pública ======
 
         /// <summary>
-        /// Descarga todos los heightmaps para city+scenario.
-        /// Devuelve rutas locales ordenadas por t_index.
-        /// Además actualiza LastFrameIntervalSeconds con lo reportado por la API.
+        /// Descarga heightmaps para city+scenario. Devuelve rutas locales ordenadas por t_index.
         /// </summary>
         public async Task<IReadOnlyList<string>> PreloadHeightmapsAsync(
+            string city,
+            string scenario,
+            CancellationToken ct = default)
+        {
+            var metas = await PreloadHeightmapsWithMetaAsync(city, scenario, ct);
+            return metas.Select(m => m.LocalPath).ToList();
+        }
+
+        /// <summary>
+        /// Igual que el anterior pero devuelve también t_sec por frame.
+        /// </summary>
+        public async Task<IReadOnlyList<FrameMeta>> PreloadHeightmapsWithMetaAsync(
             string city,
             string scenario,
             CancellationToken ct = default)
@@ -93,32 +118,31 @@ namespace Tsunami.Services
             if (string.IsNullOrWhiteSpace(city)) throw new ArgumentException("city vacío.");
             if (string.IsNullOrWhiteSpace(scenario)) throw new ArgumentException("scenario vacío.");
 
-            // 1) Timeline → lista de índices + frame_interval_sec
-            var (indices, frameIntervalSec) = await FetchTimelineAsync(city, scenario, ct);
-            LastFrameIntervalSeconds = frameIntervalSec;
+            var tinfo = await FetchTimelineAsync(city, scenario, ct);
+            LastFrameIntervalSeconds = tinfo.frameIntervalSec;
 
-            if (indices == null || indices.Count == 0)
+            if (tinfo.indices == null || tinfo.indices.Count == 0)
                 throw new Exception("El timeline está vacío.");
 
-            // 2) Carpeta por city/scenario (sin runId en tu API -> usamos clave estática)
             var runKey = $"{city}_{scenario}";
             var runFolder = Path.Combine(CacheBasePath, Sanitize($"{city}/{scenario}/{runKey}"));
             Directory.CreateDirectory(runFolder);
 
-            // 3) Resolver URLs por frame
-            var metas = await ResolveFrameMetasAsync(city, scenario, indices, runFolder, ct);
+            var items = await ResolveFrameMetasAsync(city, scenario, tinfo.indices, runFolder, tinfo.indexToSec, ct);
+            await DownloadAllAsync(items, ct);
 
-            // 4) Descargar
-            await DownloadAllAsync(metas, ct);
+            var outList = items.OrderBy(m => m.Index).Select(m => new FrameMeta
+            {
+                Index = m.Index,
+                TSec = m.TSec,
+                LocalPath = m.LocalPath
+            }).ToList();
 
-            // 5) Rutas locales ordenadas
-            return metas.OrderBy(i => i.Index).Select(i => i.LocalPath).ToList();
+            return outList;
         }
 
-        /// <summary>Devuelve la carpeta de caché base (temporal).</summary>
         public string GetCacheBasePath() => CacheBasePath;
 
-        /// <summary>Elimina toda la caché temporal generada por este servicio.</summary>
         public void ClearCache()
         {
             try
@@ -135,8 +159,7 @@ namespace Tsunami.Services
 
         // ====== Internals ======
 
-        private async Task<(List<int> indices, int frameIntervalSec)> FetchTimelineAsync(
-            string city, string scenario, CancellationToken ct)
+        private async Task<TimelineInfo> FetchTimelineAsync(string city, string scenario, CancellationToken ct)
         {
             var url = $"{ApiBaseUrl}{TimelineEndpoint}?city={UnityWebRequest.EscapeURL(city)}&scenario={UnityWebRequest.EscapeURL(scenario)}";
             using (var req = UnityWebRequest.Get(url))
@@ -160,14 +183,26 @@ namespace Tsunami.Services
                 if (obj == null || obj.items == null || obj.items.Length == 0)
                     throw new Exception("Respuesta de timeline inválida o sin items.");
 
-                var list = obj.items.Select(it => it.t_index).OrderBy(x => x).ToList();
-                var interval = Mathf.Max(0, obj.frame_interval_sec);
-                return (list, interval);
+                var indices = obj.items.Select(it => it.t_index).OrderBy(x => x).ToList();
+                var map = new Dictionary<int, int>(obj.items.Length);
+                foreach (var it in obj.items) map[it.t_index] = it.t_sec;
+
+                return new TimelineInfo
+                {
+                    indices = indices,
+                    indexToSec = map,
+                    frameIntervalSec = Mathf.Max(0, obj.frame_interval_sec)
+                };
             }
         }
 
         private async Task<List<DownloadItem>> ResolveFrameMetasAsync(
-            string city, string scenario, List<int> indices, string runFolder, CancellationToken ct)
+            string city,
+            string scenario,
+            List<int> indices,
+            string runFolder,
+            Dictionary<int, int> indexToSec,
+            CancellationToken ct)
         {
             var results = new List<DownloadItem>(indices.Count);
 
@@ -179,10 +214,11 @@ namespace Tsunami.Services
                     try
                     {
                         var meta = await FetchFrameUrlAsync(city, scenario, idx, ct);
-                        var localName = $"frame_{idx:0000}.png"; // tu API ya usa este patrón
+                        var localName = $"frame_{idx:0000}.png";
                         var di = new DownloadItem
                         {
                             Index = idx,
+                            TSec = (indexToSec != null && indexToSec.TryGetValue(idx, out var tsecs)) ? tsecs : meta.t_sec,
                             Url = meta.url,
                             LocalPath = Path.Combine(runFolder, localName),
                             ExpectedBytes = 0,
@@ -190,7 +226,10 @@ namespace Tsunami.Services
                         };
                         lock (results) results.Add(di);
                     }
-                    finally { sem.Release(); }
+                    finally
+                    {
+                        sem.Release();
+                    }
                 }).ToList();
 
                 await Task.WhenAll(tasks);
@@ -200,8 +239,7 @@ namespace Tsunami.Services
             return results;
         }
 
-        private async Task<FrameUrlObj> FetchFrameUrlAsync(
-            string city, string scenario, int tIndex, CancellationToken ct)
+        private async Task<FrameUrlObj> FetchFrameUrlAsync(string city, string scenario, int tIndex, CancellationToken ct)
         {
             var url = $"{ApiBaseUrl}{FrameUrlEndpoint}?city={UnityWebRequest.EscapeURL(city)}&scenario={UnityWebRequest.EscapeURL(scenario)}&t_index={tIndex}";
             using (var req = UnityWebRequest.Get(url))
@@ -256,14 +294,11 @@ namespace Tsunami.Services
         private async Task EnsureDownloadedAsync(DownloadItem item, CancellationToken ct)
         {
             if (File.Exists(item.LocalPath))
-            {
-                // No tenemos ExpectedBytes/ETag -> si existe, lo aceptamos
                 return;
-            }
 
             Directory.CreateDirectory(Path.GetDirectoryName(item.LocalPath));
 
-            var attempt = 0;
+            int attempt = 0;
             Exception last = null;
 
             while (attempt < MaxRetriesPerFile)
@@ -274,7 +309,7 @@ namespace Tsunami.Services
                 try
                 {
                     await DownloadToFileAsync(item.Url, item.LocalPath, ct);
-                    return; // OK
+                    return;
                 }
                 catch (Exception ex)
                 {
@@ -295,7 +330,7 @@ namespace Tsunami.Services
             using (var req = UnityWebRequest.Get(url))
             {
                 req.timeout = 60;
-                var dh = new DownloadHandlerFile(localPath, true); // resume si existe parcial
+                var dh = new DownloadHandlerFile(localPath, true);
                 req.downloadHandler = dh;
 
                 var op = req.SendWebRequest();
@@ -332,7 +367,7 @@ namespace Tsunami.Services
         {
             foreach (var c in Path.GetInvalidFileNameChars())
                 s = s.Replace(c, '_');
-            return s.Replace('\\','/'); // permite subcarpetas
+            return s.Replace('\\', '/');
         }
     }
 }
