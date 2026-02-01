@@ -97,3 +97,11 @@ InitTestScene*.unity*
 
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+
+# Asset
+/Assets/Art/HeightmapsEtaInd/eta/
+/Assets/Art/HeightmapsEtaInd/eta/*
+
+# Large Unity Scenes
+/Assets/Tsunami.unity
+/Assets/Tsunami.unity.meta
